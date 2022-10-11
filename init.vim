@@ -45,6 +45,7 @@ set spelllang=ar,en
 colorscheme tender
 
 runtime autoload/map.vim
+runtime autoload/netrw-config.vim
 
 lua << EOF
 

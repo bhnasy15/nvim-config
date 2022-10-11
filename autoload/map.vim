@@ -12,9 +12,10 @@ nnoremap <silent> <leader>to :Texplore<CR>
 nnoremap <silent> <leader>o :bd<CR>Explore<CR>
 " write and/or quit
 "nnoremap <silent> <leader>W :wq!<CR>
-nnoremap <silent> <leader>w :w!<CR>
-nnoremap <silent> <leader>Q :q<CR>
-nnoremap <silent> <leader>q :bd<CR>
+noremap <silent> <leader>W :wq!<CR>
+noremap <silent> <leader>w :w!<CR>
+noremap <silent> <leader>Q :q<CR>
+noremap <silent> <leader>q :bd<CR>
 " language
 nnoremap <silent> <leader>ar :set arabic!<CR>
 nnoremap <silent> <leader>sp :set spell!<CR>
