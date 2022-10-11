@@ -2,9 +2,9 @@ let mapleader = ","
 
 nmap <S-H> <C-W>
 
-nnoremap <silent> <leader>vf :vs<CR>FZF<CR>
-nnoremap <silent> <leader>hf :sp<CR>FZF<CR>
-nnoremap <silent> <leader>tf :tabnew<CR>FZF<CR>
+nnoremap <silent> <leader>vf :vs<CR>:FZF<CR>
+nnoremap <silent> <leader>hf :sp<CR>:FZF<CR>
+nnoremap <silent> <leader>tf :tabnew<CR>:FZF<CR>
 
 nnoremap <silent> <leader>vo :Vexplore<CR>
 nnoremap <silent> <leader>ho :Hexplore<CR>
