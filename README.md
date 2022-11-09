@@ -8,4 +8,5 @@
 - [firendly-snippets](https://github.com/rafamadriz/friendly-snippets.git)
 - [nvim-cmp](https://github.com/hrsh7th/nvim-cmp.git)
 - [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig.git)
+- [AutoPair](https://github.com/jiangmiao/auto-pairs.git)
 
