@@ -27,13 +27,13 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
   vim.keymap.set('n', '<space>c', vim.lsp.buf.code_action, bufopts)
   vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-  vim.keymap.set('n', '<space>f', vim.lsp.buf.formatting, bufopts)
+  vim.keymap.set('n', '<space>f', vim.lsp.buf.format, bufopts)
 end
 
-local lsp_flags = {
-  -- This is the default in Nvim 0.7+
-  debounce_text_changes = 150,
-}
+-- local lsp_flags = {
+  -- -- This is the default in Nvim 0.7+
+  -- debounce_text_changes = 150,
+-- }
 -- Add additional capabilities supported by nvim-cmp
 local capabilities = vim.lsp.protocol.make_client_capabilities();
 capabilities = require('cmp_nvim_lsp').update_capabilities(capabilities);
@@ -100,8 +100,33 @@ local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protoco
 -- Enable some language servers with the additional completion capabilities offered by nvim-cmp
 lspconfig['omnisharp'].setup{
 	on_attach = on_attach,
-	flags = lsp_flags,
-	cmd = {"dotnet", "/home/yarob/.opt/omnisharp-roslyn/stdio.driver/linux-x64/net6.0/OmniSharp.dll"},
-    capabilities = capabilities
+	cmd = {"/home/yarob/.opt/omnisharp-roslyn/stdio.driver/linux-x64/net6.0/OmniSharp", "-lsp"},
+	-- cmd = {"dotnet", "/home/yarob/.opt/omnisharp-roslyn/stdio.driver/linux-x64/net6.0/OmniSharp.dll"},
+    capabilities = capabilities,
+	single_file_support = false,
+	filetypes = {"cs"},
+
 }
 
+lspconfig['rust_analyzer'].setup{
+	on_attach = on_attach,
+	cmd = {"/home/yarob/.opt/rust-analyzer/server/rust-analyzer"},
+    capabilities = capabilities,
+	single_file_support = false,
+	filetypes = {"rs"},
+}
+
+lspconfig['ccls'].setup{
+	on_attach = on_attach,
+	cmd = {"/home/yarob/.opt/ccls-lsp/ccls"},
+    capabilities = capabilities,
+	single_file_support = false,
+	filetypes = {"c", "cpp"},
+}
+
+-- lspconfig['marksman'].setup{
+	-- on_attach = on_attach,
+	-- cmd = {"/home/yarob/.opt/marksman-lsp/marksman-lsp"},
+    -- capabilities = capabilities,
+	-- filetypes = {"markdown"},
+-- }
