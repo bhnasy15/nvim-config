@@ -12,6 +12,7 @@ nnoremap <silent> <leader>o :bd<CR>Explore<CR>
 " write and/or quit
 noremap <silent> <leader>W :wa<CR>
 noremap <silent> <leader>w :w<CR>
+noremap <silent> <leader>x :wq<CR>
 noremap <silent> <leader>Q :q!<CR>
 noremap <silent> <leader>q :q<CR>
 
