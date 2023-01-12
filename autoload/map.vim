@@ -4,10 +4,14 @@ nmap <space>w <C-W>
 
 nnoremap <silent> <leader>f :FZF<CR>
 
+nnoremap <silent> <leader>tn :tabnew<CR>
+nnoremap <silent> <leader>vn :vs<CR>
+nnoremap <silent> <leader>hn :sp<CR>
+
 nnoremap <silent> <leader>vo :Vexplore<CR>
 nnoremap <silent> <leader>ho :Hexplore<CR>
 nnoremap <silent> <leader>to :Texplore<CR>
-nnoremap <silent> <leader>o :bd<CR>Explore<CR>
+" nnoremap <silent> <leader>o :bd<CR>Explore<CR>
 
 " write and/or quit
 noremap <silent> <leader>W :wa<CR>
@@ -18,6 +22,7 @@ noremap <silent> <leader>q :q<CR>
 
 " buffer stuff
 noremap <silent>,bd :bd<CR>
+noremap <silent>,bn :bn<CR>
 
 " language
 nnoremap <silent> <leader>ar :set arabic!<CR>
