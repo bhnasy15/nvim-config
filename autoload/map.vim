@@ -2,6 +2,9 @@ let mapleader = ","
 
 nmap <space>w <C-W>
 
+nnoremap <silent> <C-+> :let g:neovide_scale_factor+=0.05<CR>
+nnoremap <silent> <C--> :let g:neovide_scale_factor-=0.05<CR>
+
 nnoremap <silent> <leader>f :FZF<CR>
 
 nnoremap <silent> <leader>tn :tabnew<CR>
@@ -17,7 +20,8 @@ nnoremap <silent> <leader>to :Texplore<CR>
 noremap <silent> <leader>W :wa<CR>
 noremap <silent> <leader>w :w<CR>
 noremap <silent> <leader>x :wq<CR>
-noremap <silent> <leader>Q :q!<CR>
+noremap <silent> <leader>X :wqa<CR>
+noremap <silent> <leader>Q :qa!<CR>
 noremap <silent> <leader>q :q<CR>
 
 " buffer stuff

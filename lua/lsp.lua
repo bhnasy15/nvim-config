@@ -18,9 +18,9 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
   vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
   vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
-  vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wl', function()
+  vim.keymap.set('n', '<space>Wa', vim.lsp.buf.add_workspace_folder, bufopts)
+  vim.keymap.set('n', '<space>Wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+  vim.keymap.set('n', '<space>Wl', function()
     print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
   end, bufopts)
   --vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
@@ -28,6 +28,8 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<space>c', vim.lsp.buf.code_action, bufopts)
   vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
   vim.keymap.set('n', '<space>f', vim.lsp.buf.format, bufopts)
+
+  vim.cmd('autocmd BufWritePre * 0lua vim.lsp.buf.format()')
 end
 
 -- local lsp_flags = {
@@ -110,10 +112,11 @@ lspconfig['omnisharp'].setup{
 
 lspconfig['rust_analyzer'].setup{
 	on_attach = on_attach,
-	cmd = {"/home/yarob/.opt/rust-analyzer/server/rust-analyzer"},
-    capabilities = capabilities,
-	single_file_support = false,
-	filetypes = {"rs"},
+	cmd = {"/home/yarob/.opt/rust-lsp/rust_analyzer"},
+	filetypes = {"rust"},
+	settings = {
+		["rust-analyzer"] = {},
+	}
 }
 
 lspconfig['ccls'].setup{

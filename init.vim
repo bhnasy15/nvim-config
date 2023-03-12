@@ -2,7 +2,7 @@ set t_Co=265
 
 set mouse=a
 
-set guifont=Fira\ Mono,Kawkab\ Mono:h13
+set guifont=Fira\ Mono,Kawkab\ Mono:h14
 
 set showcmd
 set wildmenu
