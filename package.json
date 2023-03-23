@@ -166,7 +166,8 @@
           "html",
           "jade",
           "pug",
-          "eruby"
+          "eruby",
+		  "php"
         ],
         "path": "./snippets/html.json"
       },

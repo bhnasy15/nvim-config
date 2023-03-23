@@ -29,7 +29,7 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
   vim.keymap.set('n', '<space>f', vim.lsp.buf.format, bufopts)
 
-  vim.cmd('autocmd BufWritePre * 0lua vim.lsp.buf.format()')
+  --vim.cmd('autocmd BufWritePre * 0lua vim.lsp.buf.format()')
 end
 
 -- local lsp_flags = {
@@ -114,6 +114,7 @@ lspconfig['rust_analyzer'].setup{
 	on_attach = on_attach,
 	cmd = {"/home/yarob/.opt/rust-lsp/rust_analyzer"},
 	filetypes = {"rust"},
+	single_file_support = false,
 	settings = {
 		["rust-analyzer"] = {},
 	}
@@ -121,15 +122,40 @@ lspconfig['rust_analyzer'].setup{
 
 lspconfig['ccls'].setup{
 	on_attach = on_attach,
-	cmd = {"/home/yarob/.opt/ccls-lsp/ccls"},
+	cmd = {"ccls"},
     capabilities = capabilities,
 	single_file_support = false,
 	filetypes = {"c", "cpp"},
 }
 
--- lspconfig['marksman'].setup{
-	-- on_attach = on_attach,
-	-- cmd = {"/home/yarob/.opt/marksman-lsp/marksman-lsp"},
-    -- capabilities = capabilities,
-	-- filetypes = {"markdown"},
--- }
+lspconfig['jdtls'].setup{
+	on_attach = on_attach,
+	cmd = {"/home/yarob/.opt/jdt/bin/jdtls",
+		--"-Declipse.application=org.eclipse.jdt.ls.core.id1",
+		--"-Dosgi.bundles.defaultStartLevel=4",
+		--"-Declipse.product=org.eclipse.jdt.ls.core.product",
+		--"-Dlog.protocol=true",
+		--"-Dlog.level=ALL",
+		--"-Xms1g",
+		--"--add-modules=ALL-SYSTEM",
+		--"--add-opens", "java.base/java.util=ALL-UNNAMED",
+		--"--add-opens", "java.base/java.lang=ALL-UNNAMED",
+         -- Must point to the eclipse.jdt.ls installation
+	--'-jar', '/home/yarob/.opt/jdt/plugins/org.eclipse.equinox.launcher_1.6.400.v20210924-0641.jar',
+    --'-configuration', '/home/yarob/.opt/jdt/config_linux/config.ini',
+    -- See data directory configuration` section in the README
+},
+	settings = {
+		java = {
+		}
+	  },
+	init_options = {
+		bundles = {}
+	  },
+	single_file_support = false,
+	filetypes = {"java"},
+}
+
+lspconfig['phpactor'].setup{
+	on_attach = on_attach,
+}

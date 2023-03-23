@@ -83,6 +83,7 @@ local root_files = {
     'pom.xml', -- Maven
     'settings.gradle', -- Gradle
     'settings.gradle.kts', -- Gradle
+	'Main.java', --sketch
   },
   -- Multi-module projects
   { 'build.gradle', 'build.gradle.kts' },

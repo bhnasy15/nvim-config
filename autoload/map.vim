@@ -4,6 +4,7 @@ nmap <space>w <C-W>
 
 nnoremap <silent> <C-+> :let g:neovide_scale_factor+=0.05<CR>
 nnoremap <silent> <C--> :let g:neovide_scale_factor-=0.05<CR>
+nnoremap <silent> <C-=> :let g:neovide_scale_factor=1<CR>
 
 nnoremap <silent> <leader>f :FZF<CR>
 
