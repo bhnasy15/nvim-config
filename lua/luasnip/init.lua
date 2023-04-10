@@ -1,8 +1,8 @@
-local snip_mod = require("luasnip.nodes.snippet")
 local util = require("luasnip.util.util")
 local session = require("luasnip.session")
 local snippet_collection = require("luasnip.session.snippet_collection")
 local Environ = require("luasnip.util.environ")
+local extend_decorator = require("luasnip.util.extend_decorator")
 
 local loader = require("luasnip.loaders")
 
@@ -10,6 +10,8 @@ local next_expand = nil
 local next_expand_params = nil
 local ls
 local luasnip_data_dir = vim.fn.stdpath("cache") .. "/luasnip"
+
+local log = require("luasnip.util.log").new("main")
 
 local function get_active_snip()
 	local node = session.current_nodes[vim.api.nvim_get_current_buf()]
@@ -50,7 +52,7 @@ local function get_snippets(ft, opts)
 	return snippet_collection.get_snippets(ft, opts.type or "snippets") or {}
 end
 
-local function get_context(snip)
+local function default_snip_info(snip)
 	return {
 		name = snip.name,
 		trigger = snip.trigger,
@@ -60,35 +62,39 @@ local function get_context(snip)
 	}
 end
 
-local function available()
+local function available(snip_info)
+	snip_info = snip_info or default_snip_info
+
 	local fts = util.get_snippet_filetypes()
 	local res = {}
 	for _, ft in ipairs(fts) do
 		res[ft] = {}
 		for _, snip in ipairs(get_snippets(ft)) do
 			if not snip.invalidated then
-				table.insert(res[ft], get_context(snip))
+				table.insert(res[ft], snip_info(snip))
 			end
 		end
 		for _, snip in ipairs(get_snippets(ft, { type = "autosnippets" })) do
 			if not snip.invalidated then
-				table.insert(res[ft], get_context(snip))
+				table.insert(res[ft], snip_info(snip))
 			end
 		end
 	end
 	return res
 end
 
-local function safe_jump(node, dir, no_move)
+local function safe_jump(node, dir, no_move, dry_run)
 	if not node then
 		return nil
 	end
 
-	local ok, res = pcall(node.jump_from, node, dir, no_move)
+	local ok, res = pcall(node.jump_from, node, dir, no_move, dry_run)
 	if ok then
 		return res
 	else
 		local snip = node.parent.snippet
+		log.warn("Removing snippet `%s` due to error %s", snip.trigger, res)
+
 		snip:remove_from_jumplist()
 		-- dir==1: try jumping into next snippet, then prev
 		-- dir==-1: try jumping into prev snippet, then next
@@ -96,13 +102,15 @@ local function safe_jump(node, dir, no_move)
 			return safe_jump(
 				snip.next.next or snip.prev.prev,
 				snip.next.next and 1 or -1,
-				no_move
+				no_move,
+				dry_run
 			)
 		else
 			return safe_jump(
 				snip.prev.prev or snip.next.next,
 				snip.prev.prev and -1 or 1,
-				no_move
+				no_move,
+				dry_run
 			)
 		end
 	end
@@ -116,6 +124,14 @@ local function jump(dir)
 	else
 		return false
 	end
+end
+local function jump_destination(dir)
+	local current = session.current_nodes[vim.api.nvim_get_current_buf()]
+	if current then
+		-- dry run of jump (+no_move ofc.), only retrieves destination-node.
+		return safe_jump(current, dir, true, { active = {} })
+	end
+	return nil
 end
 
 local function jumpable(dir)
@@ -157,6 +173,7 @@ local function in_snippet()
 	local ok, snip_begin_pos, snip_end_pos =
 		pcall(snippet.mark.pos_begin_end, snippet.mark)
 	if not ok then
+		log.warn("Error while getting extmark-position: %s", snip_begin_pos)
 		-- if there was an error getting the position, the snippets text was
 		-- most likely removed, resulting in messed up extmarks -> error.
 		-- remove the snippet.
@@ -170,7 +187,11 @@ local function in_snippet()
 end
 
 local function expand_or_locally_jumpable()
-	return expandable() or (in_snippet() and jumpable())
+	return expandable() or (in_snippet() and jumpable(1))
+end
+
+local function locally_jumpable(dir)
+	return in_snippet() and jumpable(dir)
 end
 
 local function _jump_into_default(snippet)
@@ -190,7 +211,9 @@ local function snip_expand(snippet, opts)
 	snip.trigger = opts.expand_params.trigger or snip.trigger
 	snip.captures = opts.expand_params.captures or {}
 
-	local env = Environ:new(opts.pos)
+	local info =
+		{ trigger = snip.trigger, captures = snip.captures, pos = opts.pos }
+	local env = Environ:new(info)
 
 	local pos_id = vim.api.nvim_buf_set_extmark(
 		0,
@@ -233,7 +256,9 @@ local function snip_expand(snippet, opts)
 		else
 			-- snippet was expanded behind a previously active one, leave the i(0)
 			-- properly (and remove the snippet on error).
-			if not pcall(current_node.input_leave, current_node) then
+			local ok, err = pcall(current_node.input_leave, current_node)
+			if not ok then
+				log.warn("Error while leaving snippet: ", err)
 				current_node.parent.snippet:remove_from_jumplist()
 			end
 		end
@@ -255,13 +280,18 @@ local function snip_expand(snippet, opts)
 	return snip
 end
 
-local function expand()
+---Find a snippet matching the current cursor-position.
+---@param opts table: may contain:
+--- - `jump_into_func`: passed through to `snip_expand`.
+---@return boolean: whether a snippet was expanded.
+local function expand(opts)
 	local expand_params
 	local snip
 	-- find snip via next_expand (set from previous expandable()) or manual matching.
 	if next_expand ~= nil then
 		snip = next_expand
 		expand_params = next_expand_params
+
 		next_expand = nil
 		next_expand_params = nil
 	else
@@ -269,6 +299,8 @@ local function expand()
 			match_snippet(util.get_current_line_to_cursor(), "snippets")
 	end
 	if snip then
+		local jump_into_func = opts and opts.jump_into_func
+
 		local cursor = util.get_cursor_0ind()
 		-- override snip with expanded copy.
 		snip = snip_expand(snip, {
@@ -281,6 +313,7 @@ local function expand()
 				},
 				to = cursor,
 			},
+			jump_into_func = jump_into_func,
 		})
 		return true
 	end
@@ -326,7 +359,15 @@ local function expand_or_jump()
 end
 
 local function lsp_expand(body, opts)
-	snip_expand(ls.parser.parse_snippet("", body), opts)
+	-- expand snippet as-is.
+	snip_expand(
+		ls.parser.parse_snippet(
+			"",
+			body,
+			{ trim_empty = false, dedent = false }
+		),
+		opts
+	)
 end
 
 local function choice_active()
@@ -358,11 +399,13 @@ local function set_choice(choice_indx)
 end
 
 local function get_current_choices()
-	assert(session.active_choice_node, "No active choiceNode")
+	local node = session.active_choice_node
+	assert(node, "No active choiceNode")
 
 	local choice_lines = {}
 
-	for i, choice in ipairs(session.active_choice_node.choices) do
+	node:update_static_all()
+	for i, choice in ipairs(node.choices) do
 		choice_lines[i] = table.concat(choice:get_docstring(), "\n")
 	end
 
@@ -385,14 +428,25 @@ local function active_update_dependents()
 			{ right_gravity = false }
 		)
 
-		local ok = pcall(active.update_dependents, active)
+		local ok, err = pcall(active.update_dependents, active)
 		if not ok then
+			log.warn(
+				"Error while updating dependents for snippet %s due to error %s",
+				active.parent.snippet.trigger,
+				err
+			)
 			unlink_current()
 			return
 		end
 
 		-- 'restore' orientation of extmarks, may have been changed by some set_text or similar.
-		if not pcall(active.parent.enter_node, active.parent, active.indx) then
+		ok, err = pcall(active.parent.enter_node, active.parent, active.indx)
+		if not ok then
+			log.warn(
+				"Error while entering node in snippet %s: %s",
+				active.parent.snippet.trigger,
+				err
+			)
 			unlink_current()
 			return
 		end
@@ -487,6 +541,11 @@ local function unlink_current_if_deleted()
 	local snippet = node.parent.snippet
 	local ok, snip_begin_pos, snip_end_pos =
 		pcall(snippet.mark.pos_begin_end_raw, snippet.mark)
+
+	if not ok then
+		log.warn("Error while getting extmark-position: %s", snip_begin_pos)
+	end
+
 	-- stylua: ignore
 	-- leave snippet if empty:
 	if not ok or
@@ -497,7 +556,11 @@ local function unlink_current_if_deleted()
 		-- (this can happen when deleting linewise-visual or via `dd`)
 		(snip_begin_pos[1]+1 == snip_end_pos[1] and
 		 snip_end_pos[2] == 0 and
+
 		 #vim.api.nvim_buf_get_lines(0, snip_begin_pos[1], snip_begin_pos[1]+1, true)[1] == 0) then
+
+		log.info("Detected deletion of snippet `%s`, removing it", snippet.trigger)
+
 		snippet:remove_from_jumplist()
 		session.current_nodes[vim.api.nvim_get_current_buf()] = snippet.prev.prev
 			or snippet.next.next
@@ -514,19 +577,25 @@ local function exit_out_of_region(node)
 	local snippet = node.parent.snippet
 	local ok, snip_begin_pos, snip_end_pos =
 		pcall(snippet.mark.pos_begin_end, snippet.mark)
+
+	if not ok then
+		log.warn("Error while getting extmark-position: %s", snip_begin_pos)
+	end
+
 	-- stylua: ignore
 	-- leave if curser before or behind snippet
 	if not ok or
 		pos[1] < snip_begin_pos[1] or
 		pos[1] > snip_end_pos[1] then
+
 		-- jump as long as the 0-node of the snippet hasn't been reached.
 		-- check for nil; if history is not set, the jump to snippet.next
 		-- returns nil.
 		while node and node ~= snippet.next do
-			local ok
 			-- set no_move.
 			ok, node = pcall(node.jump_from, node, 1, true)
 			if not ok then
+				log.warn("Error while jumping from node: %s", node)
 				snippet:remove_from_jumplist()
 				-- may be nil, checked later.
 				node = snippet.next
@@ -549,16 +618,20 @@ end
 -- ft string, extend_ft table of strings.
 local function filetype_extend(ft, extend_ft)
 	vim.list_extend(session.ft_redirect[ft], extend_ft)
+	session.ft_redirect[ft] = util.deduplicate(session.ft_redirect[ft])
 end
 
 -- ft string, fts table of strings.
 local function filetype_set(ft, fts)
-	session.ft_redirect[ft] = fts
+	session.ft_redirect[ft] = util.deduplicate(fts)
 end
 
 local function cleanup()
 	-- Use this to reload luasnip
-	vim.cmd([[doautocmd <nomodeline> User LuasnipCleanup]])
+	vim.api.nvim_exec_autocmds(
+		"User",
+		{ pattern = "LuasnipCleanup", modeline = false }
+	)
 	-- clear all snippets.
 	snippet_collection.clear_snippets()
 	loader.cleanup()
@@ -576,12 +649,23 @@ local function refresh_notify(ft)
 		end
 	else
 		session.latest_load_ft = ft
-		vim.cmd([[doautocmd <nomodeline> User LuasnipSnippetsAdded]])
+		vim.api.nvim_exec_autocmds(
+			"User",
+			{ pattern = "LuasnipSnippetsAdded", modeline = false }
+		)
 	end
 end
 
 local function setup_snip_env()
-	setfenv(2, vim.tbl_extend("force", _G, session.config.snip_env))
+	local combined_table = vim.tbl_extend("force", _G, session.config.snip_env)
+	-- TODO: if desired, take into account _G's __index before looking into
+	-- snip_env's __index.
+	setmetatable(combined_table, getmetatable(session.config.snip_env))
+
+	setfenv(2, combined_table)
+end
+local function get_snip_env()
+	return session.config.snip_env
 end
 
 local function get_id_snippet(id)
@@ -623,9 +707,37 @@ local function clean_invalidated(opts)
 	snippet_collection.clean_invalidated(opts)
 end
 
-ls = {
+-- make these lazy, such that we don't have to load them before it's really
+-- necessary (drives up cost of initial load, otherwise).
+-- stylua: ignore
+local ls_lazy = {
+	s = function() return require("luasnip.nodes.snippet").S end,
+	sn = function() return require("luasnip.nodes.snippet").SN end,
+	t = function() return require("luasnip.nodes.textNode").T end,
+	f = function() return require("luasnip.nodes.functionNode").F end,
+	i = function() return require("luasnip.nodes.insertNode").I end,
+	c = function() return require("luasnip.nodes.choiceNode").C end,
+	d = function() return require("luasnip.nodes.dynamicNode").D end,
+	r = function() return require("luasnip.nodes.restoreNode").R end,
+	snippet = function() return require("luasnip.nodes.snippet").S end,
+	snippet_node = function() return require("luasnip.nodes.snippet").SN end,
+	parent_indexer = function() return require("luasnip.nodes.snippet").P end,
+	indent_snippet_node = function() return require("luasnip.nodes.snippet").ISN end,
+	text_node = function() return require("luasnip.nodes.textNode").T end,
+	function_node = function() return require("luasnip.nodes.functionNode").F end,
+	insert_node = function() return require("luasnip.nodes.insertNode").I end,
+	choice_node = function() return require("luasnip.nodes.choiceNode").C end,
+	dynamic_node = function() return require("luasnip.nodes.dynamicNode").D end,
+	restore_node = function() return require("luasnip.nodes.restoreNode").R end,
+	parser = function() return require("luasnip.util.parser") end,
+	config = function() return require("luasnip.config") end,
+	multi_snippet = function() return require("luasnip.nodes.multiSnippet").new_multisnippet end,
+}
+
+ls = util.lazy_table({
 	expand_or_jumpable = expand_or_jumpable,
 	expand_or_locally_jumpable = expand_or_locally_jumpable,
+	locally_jumpable = locally_jumpable,
 	jumpable = jumpable,
 	expandable = expandable,
 	in_snippet = in_snippet,
@@ -654,32 +766,17 @@ ls = {
 	get_snippets = get_snippets,
 	get_id_snippet = get_id_snippet,
 	setup_snip_env = setup_snip_env,
+	get_snip_env = get_snip_env,
 	clean_invalidated = clean_invalidated,
 	get_snippet_filetypes = util.get_snippet_filetypes,
-	s = snip_mod.S,
-	sn = snip_mod.SN,
-	t = require("luasnip.nodes.textNode").T,
-	f = require("luasnip.nodes.functionNode").F,
-	i = require("luasnip.nodes.insertNode").I,
-	c = require("luasnip.nodes.choiceNode").C,
-	d = require("luasnip.nodes.dynamicNode").D,
-	r = require("luasnip.nodes.restoreNode").R,
-	snippet = snip_mod.S,
-	snippet_node = snip_mod.SN,
-	parent_indexer = snip_mod.P,
-	indent_snippet_node = snip_mod.ISN,
-	text_node = require("luasnip.nodes.textNode").T,
-	function_node = require("luasnip.nodes.functionNode").F,
-	insert_node = require("luasnip.nodes.insertNode").I,
-	choice_node = require("luasnip.nodes.choiceNode").C,
-	dynamic_node = require("luasnip.nodes.dynamicNode").D,
-	restore_node = require("luasnip.nodes.restoreNode").R,
-	parser = require("luasnip.util.parser"),
-	config = require("luasnip.config"),
+	jump_destination = jump_destination,
 	session = session,
 	cleanup = cleanup,
 	refresh_notify = refresh_notify,
 	env_namespace = Environ.env_namespace,
-}
+	setup = require("luasnip.config").setup,
+	extend_decorator = extend_decorator,
+	log = require("luasnip.util.log"),
+}, ls_lazy)
 
 return ls

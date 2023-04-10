@@ -23,17 +23,18 @@ return {
       return util.root_pattern 'tsconfig.json'(fname)
         or util.root_pattern('package.json', 'jsconfig.json', '.git')(fname)
     end,
+    single_file_support = true,
   },
   docs = {
     description = [[
-https://github.com/theia-ide/typescript-language-server
+https://github.com/typescript-language-server/typescript-language-server
 
 `typescript-language-server` depends on `typescript`. Both packages can be installed via `npm`:
 ```sh
 npm install -g typescript typescript-language-server
 ```
 
-To configure type language server, add a
+To configure typescript language server, add a
 [`tsconfig.json`](https://www.typescriptlang.org/docs/handbook/tsconfig-json.html) or
 [`jsconfig.json`](https://code.visualstudio.com/docs/languages/jsconfig) to the root of your
 project.

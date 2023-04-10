@@ -189,6 +189,7 @@ end
 local function insert_move_on(new_cur_pos)
 	-- maybe feedkeys this too.
 	set_cursor_0ind(new_cur_pos)
+	vim.api.nvim_command("redraw!")
 end
 
 local function multiline_equal(t1, t2)
@@ -233,12 +234,21 @@ local function put(text, pos)
 	pos[2] = (#text > 1 and 0 or pos[2]) + #text[#text]
 end
 
--- Wrap a value in a table if it isn't one already
-local function wrap_value(value)
-	if not value or type(value) == "table" then
-		return value
+--[[ Wraps the value in a table if it's not one, makes
+  the first element an empty str if the table is empty]]
+local function to_string_table(value)
+	if not value then
+		return { "" }
 	end
-	return { value }
+	if type(value) == "string" then
+		return { value }
+	end
+	-- at this point it's a table
+	if #value == 0 then
+		return { "" }
+	end
+	-- non empty table
+	return value
 end
 
 -- Wrap node in a table if it is not one
@@ -425,7 +435,7 @@ local function buffer_comment_chars()
 end
 
 local function to_line_table(table_or_string)
-	local tbl = wrap_value(table_or_string)
+	local tbl = to_string_table(table_or_string)
 
 	-- split entries at \n.
 	local line_table = {}
@@ -456,15 +466,6 @@ local function redirect_filetypes(fts)
 	return snippet_fts
 end
 
-local function get_snippet_filetypes()
-	local config = require("luasnip.session").config
-	local fts = config.ft_func()
-	-- add all last.
-	table.insert(fts, "all")
-
-	return redirect_filetypes(fts)
-end
-
 local function deduplicate(list)
 	vim.validate({ list = { list, "table" } })
 	local ret = {}
@@ -478,14 +479,13 @@ local function deduplicate(list)
 	return ret
 end
 
-local json_decode
-local json_encode
-if vim.json then
-	json_decode = vim.json.decode
-	json_encode = vim.json.encode
-else
-	json_decode = vim.fn.json_decode
-	json_encode = vim.fn.json_encode
+local function get_snippet_filetypes()
+	local config = require("luasnip.session").config
+	local fts = config.ft_func()
+	-- add all last.
+	table.insert(fts, "all")
+
+	return deduplicate(redirect_filetypes(fts))
 end
 
 local function pos_add(p1, p2)
@@ -538,6 +538,59 @@ local function no_region_check_wrap(fn, ...)
 	return fn(...)
 end
 
+local function id(a)
+	return a
+end
+
+local function no()
+	return false
+end
+
+local function yes()
+	return true
+end
+
+local function reverse_lookup(t)
+	local rev = {}
+	for k, v in pairs(t) do
+		rev[v] = k
+	end
+	return rev
+end
+
+local function nop() end
+
+local function indx_of(t, v)
+	for i, value in ipairs(t) do
+		if v == value then
+			return i
+		end
+	end
+	return nil
+end
+
+local function lazy_table(lazy_t, lazy_defs)
+	return setmetatable(lazy_t, {
+		__index = function(t, k)
+			local v = lazy_defs[k]
+			if v then
+				local v_resolved = v()
+				rawset(t, k, v_resolved)
+				return v_resolved
+			end
+			return nil
+		end,
+	})
+end
+
+local function ternary(cond, if_val, else_val)
+	if cond == true then
+		return if_val
+	else
+		return else_val
+	end
+end
+
 return {
 	get_cursor_0ind = get_cursor_0ind,
 	set_cursor_0ind = set_cursor_0ind,
@@ -552,7 +605,7 @@ return {
 	multiline_equal = multiline_equal,
 	word_under_cursor = word_under_cursor,
 	put = put,
-	wrap_value = wrap_value,
+	to_string_table = to_string_table,
 	wrap_nodes = wrap_nodes,
 	store_selection = store_selection,
 	get_selection = get_selection,
@@ -561,15 +614,14 @@ return {
 	indent = indent,
 	expand_tabs = expand_tabs,
 	tab_width = tab_width,
-	clear_invalid = clear_invalid,
 	buffer_comment_chars = buffer_comment_chars,
 	string_wrap = string_wrap,
 	to_line_table = to_line_table,
 	find_outer_snippet = find_outer_snippet,
 	redirect_filetypes = redirect_filetypes,
 	get_snippet_filetypes = get_snippet_filetypes,
-	json_encode = json_encode,
-	json_decode = json_decode,
+	json_decode = vim.json.decode,
+	json_encode = vim.json.encode,
 	bytecol_to_utfcol = bytecol_to_utfcol,
 	pos_sub = pos_sub,
 	pos_add = pos_add,
@@ -577,4 +629,12 @@ return {
 	pop_front = pop_front,
 	key_sorted_pairs = key_sorted_pairs,
 	no_region_check_wrap = no_region_check_wrap,
+	id = id,
+	no = no,
+	yes = yes,
+	reverse_lookup = reverse_lookup,
+	nop = nop,
+	indx_of = indx_of,
+	lazy_table = lazy_table,
+	ternary = ternary,
 }

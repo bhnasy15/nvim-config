@@ -37,6 +37,10 @@ local function split_lines(filestring)
 	)
 end
 
+local function _is_present(v)
+	return v ~= nil
+end
+
 local function normalize_paths(paths, rtp_dirname)
 	if not paths then
 		paths = vim.api.nvim_get_runtime_file(rtp_dirname, true)
@@ -45,6 +49,7 @@ local function normalize_paths(paths, rtp_dirname)
 	end
 
 	paths = vim.tbl_map(Path.expand, paths)
+	paths = vim.tbl_filter(_is_present, paths)
 	paths = util.deduplicate(paths)
 
 	return paths
@@ -89,7 +94,11 @@ local function get_ft_paths(root, extension)
 		files, _ = Path.scandir(dir)
 		for _, file in ipairs(files) do
 			if vim.endswith(file, extension) then
-				_append(ft_path, ft, file)
+				-- produce normalized filenames.
+				local normalized_fname = Path.normalize(file)
+				if normalized_fname then
+					_append(ft_path, ft, normalized_fname)
+				end
 			end
 		end
 	end
@@ -120,6 +129,8 @@ end
 --- entries:
 --- - collection_paths: ft->files for the entire collection and
 --- - load_paths: ft->files for only the files that should be loaded.
+--- All produced filenames are normalized, eg. links are resolved and
+--- unnecessary . or .. removed.
 local function get_load_paths_snipmate_like(opts, rtp_dirname, extension)
 	local collections_load_paths = {}
 

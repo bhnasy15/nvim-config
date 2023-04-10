@@ -28,8 +28,6 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<space>c', vim.lsp.buf.code_action, bufopts)
   vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
   vim.keymap.set('n', '<space>f', vim.lsp.buf.format, bufopts)
-
-  --vim.cmd('autocmd BufWritePre * 0lua vim.lsp.buf.format()')
 end
 
 -- local lsp_flags = {
@@ -38,7 +36,7 @@ end
 -- }
 -- Add additional capabilities supported by nvim-cmp
 local capabilities = vim.lsp.protocol.make_client_capabilities();
-capabilities = require('cmp_nvim_lsp').update_capabilities(capabilities);
+capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities);
 
 local lspconfig = require('lspconfig');
 
@@ -98,7 +96,7 @@ sources = cmp.config.sources({
 })
 })
 -- Setup lspconfig.
-local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
+local capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
 -- Enable some language servers with the additional completion capabilities offered by nvim-cmp
 lspconfig['omnisharp'].setup{
 	on_attach = on_attach,
@@ -111,6 +109,7 @@ lspconfig['omnisharp'].setup{
 }
 
 lspconfig['rust_analyzer'].setup{
+	autostart = false,
 	on_attach = on_attach,
 	cmd = {"/home/yarob/.opt/rust-lsp/rust_analyzer"},
 	filetypes = {"rust"},
@@ -120,15 +119,20 @@ lspconfig['rust_analyzer'].setup{
 	}
 }
 
-lspconfig['ccls'].setup{
+lspconfig['zls'].setup{
+	autostart = false,
 	on_attach = on_attach,
-	cmd = {"ccls"},
     capabilities = capabilities,
-	single_file_support = false,
-	filetypes = {"c", "cpp"},
+}
+
+lspconfig['ccls'].setup{
+	autostart = false,
+	on_attach = on_attach,
+    capabilities = capabilities,
 }
 
 lspconfig['jdtls'].setup{
+	autostart = false,
 	on_attach = on_attach,
 	cmd = {"/home/yarob/.opt/jdt/bin/jdtls",
 		--"-Declipse.application=org.eclipse.jdt.ls.core.id1",
@@ -157,5 +161,6 @@ lspconfig['jdtls'].setup{
 }
 
 lspconfig['phpactor'].setup{
+	autostart = false,
 	on_attach = on_attach,
 }

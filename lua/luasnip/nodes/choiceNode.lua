@@ -7,6 +7,7 @@ local events = require("luasnip.util.events")
 local mark = require("luasnip.util.mark").mark
 local session = require("luasnip.session")
 local sNode = require("luasnip.nodes.snippet").SN
+local extend_decorator = require("luasnip.util.extend_decorator")
 
 function ChoiceNode:init_nodes()
 	for i, choice in ipairs(self.choices) do
@@ -73,6 +74,7 @@ local function C(pos, choices, opts)
 	c:init_nodes()
 	return c
 end
+extend_decorator.register(C, { arg_indx = 3 })
 
 function ChoiceNode:subsnip_init()
 	node_util.subsnip_init_children(self.parent, self.choices)
@@ -112,7 +114,7 @@ function ChoiceNode:put_initial(pos)
 	local mark_opts = vim.tbl_extend("keep", {
 		right_gravity = false,
 		end_right_gravity = false,
-	}, self.active_choice.ext_opts.passive)
+	}, self.active_choice:get_passive_ext_opts())
 
 	self.active_choice.mark = mark(old_pos, pos, mark_opts)
 	self.visible = true
@@ -130,21 +132,32 @@ function ChoiceNode:expand_tabs(tabwidth, indentstringlen)
 	end
 end
 
-function ChoiceNode:input_enter()
+function ChoiceNode:input_enter(_, dry_run)
+	if dry_run then
+		dry_run.active[self] = true
+		return
+	end
+
 	self.mark:update_opts(self.ext_opts.active)
 	self.parent:enter_node(self.indx)
 
 	self.prev_choice_node = session.active_choice_node
 	session.active_choice_node = self
+	self.visited = true
 	self.active = true
 
 	self:event(events.enter)
 end
 
-function ChoiceNode:input_leave()
+function ChoiceNode:input_leave(_, dry_run)
+	if dry_run then
+		dry_run.active[self] = false
+		return
+	end
+
 	self:event(events.leave)
 
-	self.mark:update_opts(self.ext_opts.passive)
+	self.mark:update_opts(self:get_passive_ext_opts())
 	self:update_dependents()
 	session.active_choice_node = self.prev_choice_node
 	self.active = false
@@ -166,22 +179,32 @@ function ChoiceNode:get_docstring()
 	)
 end
 
-function ChoiceNode:jump_into(dir, no_move)
-	if self.active then
-		self:input_leave()
+function ChoiceNode:jump_into(dir, no_move, dry_run)
+	self:init_dry_run_active(dry_run)
+
+	if self:is_active(dry_run) then
+		self:input_leave(no_move, dry_run)
+
 		if dir == 1 then
-			return self.next:jump_into(dir, no_move)
+			return self.next:jump_into(dir, no_move, dry_run)
 		else
-			return self.prev:jump_into(dir, no_move)
+			return self.prev:jump_into(dir, no_move, dry_run)
 		end
 	else
-		self:input_enter()
-		return self.active_choice:jump_into(dir, no_move)
+		self:input_enter(no_move, dry_run)
+
+		return self.active_choice:jump_into(dir, no_move, dry_run)
 	end
 end
 
 function ChoiceNode:update()
 	self.active_choice:update()
+end
+
+function ChoiceNode:update_static_all()
+	for _, choice in ipairs(self.choices) do
+		choice:update_static()
+	end
 end
 
 function ChoiceNode:update_static()
@@ -238,7 +261,7 @@ function ChoiceNode:set_choice(choice, current_node)
 	self.active_choice = choice
 
 	self.active_choice.mark = self.mark:copy_pos_gravs(
-		vim.deepcopy(self.active_choice.ext_opts.passive)
+		vim.deepcopy(self.active_choice:get_passive_ext_opts())
 	)
 
 	-- re-init positions for child-restoreNodes (they will update their
@@ -326,7 +349,8 @@ function ChoiceNode:set_mark_rgrav(rgrav_beg, rgrav_end)
 end
 
 function ChoiceNode:set_ext_opts(name)
-	self.mark:update_opts(self.ext_opts[name])
+	Node.set_ext_opts(self, name)
+
 	self.active_choice:set_ext_opts(name)
 end
 

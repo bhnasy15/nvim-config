@@ -147,7 +147,7 @@ passed overrides to `setup {}` are:
 <
   is:
 >
-  {'foo', '--bar', 'baz}
+  {'foo', '--bar', 'baz'}
 <
 - {handlers} `list[functions]`
 
@@ -215,17 +215,39 @@ The global defaults for all servers can be overridden by extending the
             if params and params.type <= vim.lsp.protocol.MessageType.Log then
               vim.lsp.handlers["window/logMessage"](err, method, params, client_id)
             end
-          end;
+          end,
         ["window/showMessage"] = function(err, method, params, client_id)
             if params and params.type <= vim.lsp.protocol.MessageType.Warning.Error then
               vim.lsp.handlers["window/showMessage"](err, method, params, client_id)
             end
-          end;
+          end,
       }
     }
   )
 <
 `setup {}` can additionally override these defaults in subsequent calls.
+
+==============================================================================
+SETUP HOOK                                                *lspconfig-setup-hook*
+
+`lspconfig` will execute the `on_setup` hook for each setup call to a server after
+validating its configuration, and before attempting to launch the server
+itself. One typical usage is to allow ad-hoc substitution for any
+configuration entry, such as `cmd`.
+
+>
+  local lspconfig = require 'lspconfig'
+  lspconfig.util.on_setup = lspconfig.util.add_hook_before(lspconfig.util.on_setup, function(config)
+    if some_condition and config.name == "clangd" then
+      local custom_server_prefix = "/my/custom/server/prefix"
+      config.cmd = { custom_server_prefix .. "/bin/clangd" }
+    end
+  end)
+
+
+Note: This is primarily targeted at plugins developers, so make sure to use
+`util.add_hook_before()` as a wrapper instead of overriding the original function
+completely, to void breaking external integrations with lspconfig.
 
 ==============================================================================
 SERVER CONFIGURATIONS                                 *lspconfig-configurations*
@@ -242,35 +264,49 @@ The `configs` module is a singleton where configs are defined. The schema for
 validating using `vim.validate` is:
 >
     configs.SERVER_NAME = {
-      default_config = {'t'};
-      on_new_config = {'f', true};
-      on_attach = {'f', true};
-      commands = {'t', true};
-      docs = {'t', true};
+      default_config = {'t'},
+      on_new_config = {'f', true},
+      on_attach = {'f', true},
+      commands = {'t', true},
+      docs = {'t', true},
     }
 <
 where the structure of the docs table is as follows:
 >
     docs = {
-      description = {'s', true};
-      default_config = {'t', true};
+      description = {'s', true},
+      default_config = {'t', true},
     }
 <
 `commands` is a map of `name:definition` key:value pairs, where `definition`
 is a list whose first value is a function implementing the command, and the
 rest are either array values which will be formed into flags for the command,
-or special keys like `description`. Example:
+or special keys like `description`.
+
+Warning: Commands is deprecated and will be removed in future releases.
+It is recommended to use `vim.api.nvim_create_user_command()` instead in an `on_attach` function.
+
+Example:
 >
-  commands = {
-    TexlabBuild = {
-      function()
-        buf_build(0)
-      end;
-      "-range";
-      description = "Build the current buffer";
-    };
-  };
+  local function organize_imports()
+    local params = {
+      command = 'pyright.organizeimports',
+      arguments = { vim.uri_from_bufnr(0) },
+    }
+    vim.lsp.buf.execute_command(params)
+  end
+
+  local on_attach = function(client, bufnr)
+    if client.name == "pyright" then
+      vim.api.nvim_create_user_command("PyrightOrganizeImports", organize_imports, {desc = 'Organize Imports'})
+    end
+  end
+
+  require("lspconfig")['pyright'].setup({
+    on_attach = on_attach
+  })
 <
+
 The `configs.__newindex` metamethod consumes the config definition and returns
 an object with a `setup()` method, to be invoked by users:
 >
@@ -283,6 +319,7 @@ Example:
 >
     configs.texlab.buf_build = buf_build
 <
+
 ==============================================================================
 ADDING NEW SERVERS                                    *lspconfig-new*
 
@@ -298,13 +335,13 @@ The steps for adding and enabling a new server configuration are:
    if not configs.foo_lsp then
      configs.foo_lsp = {
        default_config = {
-         cmd = {'/home/neovim/lua-language-server/run.sh'};
-         filetypes = {'lua'};
+         cmd = {'/home/neovim/lua-language-server/run.sh'},
+         filetypes = {'lua'},
          root_dir = function(fname)
            return lspconfig.util.find_git_ancestor(fname)
-         end;
-         settings = {};
-       };
+         end,
+         settings = {},
+       },
      }
    end
 
@@ -333,7 +370,7 @@ below returns a function that takes as its argument the current buffer path.
 
 - `util.root_pattern`: function which takes multiple arguments, each 
   corresponding to a different root pattern against which the contents of the
-  current directory are matched using |vim.fin.glob()| while traversing up the
+  current directory are matched using |vim.fn.glob()| while traversing up the
   filesystem.
 >
    root_dir = util.root_pattern('pyproject.toml', 'requirements.txt')
@@ -405,6 +442,8 @@ mode under which cross-file features may be degraded.
   `workspaceFolders` during initialization.
 - attaching subsequent files in the parent directory to the same server
   instance, depending on filetype.
+- also supports unnamed buffer if filetype matches the server filetype
+  settings.
 
 Cross-file features (navigation, hover) may or may not work depending on the
 language server. For a full feature-set, consider moving your files to a
@@ -428,7 +467,8 @@ contained in `:LspInfo`:
   if it successfully resolves a root directory. Note: Defaults to all
   configured servers matching the current buffer filetype.
 - `:LspStop <client_id>` stops the server with the given client id. Defaults to
-  stopping all servers active on the current buffer.
+  stopping all servers active on the current buffer. if you want to force stop
+  a language server you can do it like `:LspStop <client_id> ++force`
 - `:LspRestart <client_id>` restarts the client with the given client id, and
   will attempt to reattach to all previously attached buffers.
 
@@ -472,7 +512,7 @@ attached to a given buffer.
     vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
     vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
     vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-    vim.keymap.set('n', '<space>f', vim.lsp.buf.formatting, bufopts)
+    vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
   end
 
   local lsp_flags = {
@@ -593,6 +633,18 @@ necessary to enable features critical to its usability. For more featureful
 options, the `lspconfig` wiki lists community created plugins that build upon
 the built-in client to provide functionality tailored to specific language
 servers.
+
+==============================================================================
+Highlights                                                *lspconfig-highlight*
+
+LspInfoTitle        Client name
+LspInfoList         Server name list
+LspInfoFiletype     `filetypes` area
+LspInfoTip          Tip
+LspInfoBorder       Window border
+    To set the border use: >
+        require('lspconfig.ui.windows').default_options.border = 'single'
+<    Accepts the same values as the `border` option to |nvim_open_win()|
 
 ==============================================================================
 

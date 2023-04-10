@@ -83,7 +83,6 @@ local root_files = {
     'pom.xml', -- Maven
     'settings.gradle', -- Gradle
     'settings.gradle.kts', -- Gradle
-	'Main.java', --sketch
   },
   -- Multi-module projects
   { 'build.gradle', 'build.gradle.kts' },
@@ -121,6 +120,7 @@ return {
       ['textDocument/rename'] = on_textdocument_rename,
       ['workspace/applyEdit'] = on_workspace_applyedit,
       ['language/status'] = vim.schedule_wrap(on_language_status),
+      ['$/progress'] = vim.schedule_wrap(on_language_status),
     },
   },
   docs = {

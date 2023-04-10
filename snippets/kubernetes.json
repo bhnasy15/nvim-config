@@ -97,7 +97,7 @@
         ]
     },
     "k8s Deployment": {
-        "prefix": "k-deploymment",
+        "prefix": "k-deployment",
         "description": "k8s Deployment",
         "body": [
             "# https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
@@ -205,8 +205,8 @@
         "description": "k8s ConfigMap",
         "body": [
             "# https://kubernetes.io/docs/concepts/configuration/configmap/",
-            "kind: ConfigMap",
             "apiVersion: v1",
+            "kind: ConfigMap",
             "metadata:",
             "  name: ${1:myconfig}",
             "  namespace: ${2:default}",

@@ -1,11 +1,11 @@
 local ls = require("luasnip")
 local cache = require("luasnip.loaders._caches").snipmate
-local util = require("luasnip.util.util")
-local str_util = require("luasnip.util.str")
 local loader_util = require("luasnip.loaders.util")
 local Path = require("luasnip.util.path")
-local session = require("luasnip.session")
 local sp = require("luasnip.nodes.snippetProxy")
+local snipmate_parse_fn = require("luasnip.util.parser").parse_snipmate
+
+local log = require("luasnip.util.log").new("snipmate-loader")
 
 local function parse_snipmate(buffer, filename)
 	-- could also be separate variables, but easier to access this way.
@@ -46,12 +46,18 @@ local function parse_snipmate(buffer, filename)
 		end
 
 		body = table.concat(body, "\n")
-		local snip = sp({
-			trig = prefix,
-			dscr = description,
-			wordTrig = true,
-			priority = snipmate_opts.priority,
-		}, body)
+		local snip = sp(
+			{
+				trig = prefix,
+				dscr = description,
+				wordTrig = true,
+				priority = snipmate_opts.priority,
+			},
+			body,
+			{
+				parse_fn = snipmate_parse_fn,
+			}
+		)
 		table.insert(snippets[snippet_type], snip)
 	end
 
@@ -78,7 +84,8 @@ local function parse_snipmate(buffer, filename)
 			snipmate_opts.priority = tonumber(line:match("priority%s+(%d+)"))
 			i = i + 1
 		else
-			error(("invalid line in %s: %s"):format(filename, i))
+			log.error("Invalid line in %s: %s", filename, i)
+			error(("Invalid line in %s: %s"):format(filename, i))
 		end
 	end
 
@@ -97,31 +104,23 @@ local function load_snippet_files(add_ft, paths, collection_files, add_opts)
 			snippet = vim.deepcopy(cache.path_snippets[path].snippet)
 			autosnippet = vim.deepcopy(cache.path_snippets[path].autosnippet)
 			extends = cache.path_snippets[path].extends
+			cache.path_snippets[path].fts[add_ft] = true
 		else
-			local buffer = Path.read_file(path)
-			snippet, autosnippet, extends = parse_snipmate(buffer, path)
-			cache.path_snippets[path] = {
-				snippet = vim.deepcopy(snippet),
-				autosnippet = vim.deepcopy(autosnippet),
-				extends = extends,
-				-- store for reload.
-				add_opts = add_opts,
-			}
+			local buffer_ok, buffer = pcall(Path.read_file, path)
+			if buffer_ok then
+				snippet, autosnippet, extends = parse_snipmate(buffer, path)
+				cache.path_snippets[path] = {
+					snippet = vim.deepcopy(snippet),
+					autosnippet = vim.deepcopy(autosnippet),
+					extends = extends,
+					-- store for reload.
+					add_opts = add_opts,
+					fts = { [add_ft] = true },
+				}
+			else
+				log.error(("Could not read file %s: %s"):format(path, buffer))
+			end
 		end
-
-		-- ++once: the autocommand will be re-added because this file will run again.
-		vim.cmd(string.format(
-			[[
-				augroup luasnip_watch_reload
-				autocmd BufWritePost %s ++once lua require("luasnip.loaders.from_snipmate").reload_file("%s", "%s")
-				augroup END
-			]],
-			-- escape for autocmd-pattern.
-			str_util.aupatescape(path),
-			-- args for reload.
-			add_ft,
-			path
-		))
 
 		ls.add_snippets(
 			add_ft,
@@ -140,6 +139,13 @@ local function load_snippet_files(add_ft, paths, collection_files, add_opts)
 				type = "autosnippets",
 				key = string.format("__%s_autosnippets_%s", add_ft, path),
 			}, add_opts)
+		)
+		log.info(
+			"Adding %s snippets and %s autosnippets for filetype `%s` from %s",
+			#snippet,
+			#autosnippet,
+			add_ft,
+			path
 		)
 
 		for _, ft in ipairs(extends) do
@@ -169,6 +175,8 @@ function M.load(opts)
 
 	for _, collection in ipairs(collections_load_paths) do
 		local load_paths = collection.load_paths
+		log.info("Loading snippet-collection:\n%s", vim.inspect(load_paths))
+
 		local collection_paths = collection.collection_paths
 
 		-- also add files from load_paths to cache (collection of all loaded
@@ -200,6 +208,7 @@ function M._load_lazy_loaded(bufnr)
 
 	for _, ft in ipairs(fts) do
 		if not cache.lazy_loaded_ft[ft] then
+			log.info("Loading lazy-load-snippets for filetype `%s`", ft)
 			M._load_lazy_loaded_ft(ft)
 			cache.lazy_loaded_ft[ft] = true
 		end
@@ -223,11 +232,18 @@ function M.lazy_load(opts)
 		for ft, paths in pairs(load_paths) do
 			if cache.lazy_loaded_ft[ft] then
 				-- instantly load snippets if the ft is already loaded...
+				log.info(
+					"Immediately loading lazy-load-snippets for already-active filetype `%s` from files:\n%s",
+					ft,
+					vim.inspect(paths)
+				)
 				load_snippet_files(ft, paths, collection_paths, add_opts)
 				-- clear from load_paths to prevent duplicat loads.
 				load_paths[ft] = nil
 			end
 		end
+
+		log.info("Registering lazy-load-snippets:\n%s", vim.inspect(load_paths))
 
 		load_paths.collection = collection_paths
 		load_paths.add_opts = add_opts
@@ -242,16 +258,25 @@ function M.edit_snippet_files()
 	loader_util.edit_snippet_files(cache.ft_paths)
 end
 
-function M.reload_file(ft, file)
-	local file_cache = cache.path_snippets[file]
+-- Make sure filename is normalized.
+function M._reload_file(filename)
+	local cached_data = cache.path_snippets[filename]
+	if not cached_data then
+		return
+	end
 
-	if file_cache then
-		local add_opts = file_cache.add_opts
-		cache.path_snippets[file] = nil
+	local add_opts = cached_data.add_opts
+	cache.path_snippets[filename] = nil
 
+	for ft, _ in pairs(cached_data.fts) do
+		log.info(
+			"Re-loading snippets contributed by %s for filetype `%s`",
+			filename,
+			ft
+		)
 		-- we can safely set collection to empty, the `extends` are already
-		-- "set up", eg have their own autocommands for reloading.
-		load_snippet_files(ft, { file }, {}, add_opts)
+		-- "set up", eg are included via cached_data.fts.
+		load_snippet_files(ft, { filename }, {}, add_opts)
 
 		ls.clean_invalidated({ inv_limit = 100 })
 	end

@@ -1,6 +1,5 @@
 local session = require("luasnip.session")
 local util = require("luasnip.util.util")
-local types = require("luasnip.util.types")
 local node_util = require("luasnip.nodes.util")
 local ext_util = require("luasnip.util.ext_opts")
 local events = require("luasnip.util.events")
@@ -17,6 +16,7 @@ function Node:new(o, opts)
 	o.visible = false
 	o.static_visible = false
 	o.old_text = {}
+	o.visited = false
 	-- override existing keys, might be necessary due to double-init from
 	-- snippetProxy, but shouldn't hurt.
 	o = vim.tbl_extend("force", o, node_util.init_node_opts(opts or {}))
@@ -44,7 +44,10 @@ function Node:get_static_text()
 	-- })
 	--
 	-- )
-	if not self.static_visible then
+	-- By also allowing visible, and not only static_visible, the docstrings
+	-- generated during `get_current_choices` (ie. without having the whole
+	-- snippet `static_init`ed) get better.
+	if not self.visible and not self.static_visible then
 		return nil
 	end
 	return self.static_text
@@ -64,28 +67,50 @@ function Node:put_initial(pos)
 	self.visible = true
 end
 
-function Node:input_enter(_)
+function Node:input_enter(_, _)
+	self.visited = true
 	self.mark:update_opts(self.ext_opts.active)
 
 	self:event(events.enter)
 end
 
-function Node:jump_into(_, no_move)
-	self:input_enter(no_move)
+-- dry_run: if not nil, it has to be a table with the key `active` also a table.
+-- dry_run.active[node] stores whether the node is "active" in the dry run (we
+-- can't change the `active`-state in the actual node, so changes to the
+-- active-state are stored in the `dry_run`-table, which is passed to all nodes
+-- that participate in the jump)
+-- The changes to `active` have to be stored. Otherwise, `dry_run` can lead to
+-- endless loops in cases like:
+-- ```lua
+-- s({ trig = 'n' } , { i(1, "1"), sn(2, {t"asdf"}), i(3, "3") })
+-- ```
+--
+-- Here, jumping from 1 will first set active on the snippetNode, then, since
+-- there are no interactive nodes inside it, and since active is set, we will
+-- jump to the `i(3)`.
+-- If active is not set during the dry_run, we will just keep jumping into the
+-- inner textNode.
+--
+-- A similar problem occurs in nested expansions (insertNode.inner_active
+-- is not set).
+function Node:jump_into(_, no_move, dry_run)
+	if not dry_run then
+		self:input_enter(no_move, dry_run)
+	end
 	return self
 end
 
-function Node:jump_from(dir, no_move)
-	self:input_leave()
+function Node:jump_from(dir, no_move, dry_run)
+	self:input_leave(no_move, dry_run)
 	if dir == 1 then
 		if self.next then
-			return self.next:jump_into(dir, no_move)
+			return self.next:jump_into(dir, no_move, dry_run)
 		else
 			return nil
 		end
 	else
 		if self.prev then
-			return self.prev:jump_into(dir, no_move)
+			return self.prev:jump_into(dir, no_move, dry_run)
 		else
 			return nil
 		end
@@ -138,25 +163,45 @@ function Node:exit()
 	self.mark:clear()
 end
 
-function Node:input_leave()
-	self:event(events.leave)
-
-	self.mark:update_opts(self.ext_opts.passive)
+function Node:get_passive_ext_opts()
+	if self.visited then
+		return self.ext_opts.visited
+	else
+		return self.ext_opts.unvisited
+	end
 end
 
-local function find_dependents(position_self, dict)
+function Node:input_leave(_, dry_run)
+	if dry_run then
+		return
+	end
+	self:event(events.leave)
+
+	self.mark:update_opts(self:get_passive_ext_opts())
+end
+
+local function find_dependents(self, position_self, dict)
+	local nodes = {}
+
 	position_self[#position_self + 1] = "dependents"
-	local nodes = dict:find_all(position_self, "dependent")
+	vim.list_extend(nodes, dict:find_all(position_self, "dependent") or {})
 	position_self[#position_self] = nil
+
+	vim.list_extend(
+		nodes,
+		dict:find_all({ self, "dependents" }, "dependent") or {}
+	)
+
 	return nodes
 end
 
 function Node:_update_dependents()
 	local dependent_nodes = find_dependents(
+		self,
 		self.absolute_insert_position,
 		self.parent.snippet.dependents_dict
 	)
-	if not dependent_nodes then
+	if #dependent_nodes == 0 then
 		return
 	end
 	for _, node in ipairs(dependent_nodes) do
@@ -179,10 +224,11 @@ Node.update_all_dependents = Node._update_dependents
 
 function Node:_update_dependents_static()
 	local dependent_nodes = find_dependents(
+		self,
 		self.absolute_insert_position,
 		self.parent.snippet.dependents_dict
 	)
-	if not dependent_nodes then
+	if #dependent_nodes == 0 then
 		return
 	end
 	for _, node in ipairs(dependent_nodes) do
@@ -196,6 +242,7 @@ Node.update_dependents_static = Node._update_dependents_static
 Node.update_all_dependents_static = Node._update_dependents_static
 
 function Node:update() end
+
 function Node:update_static() end
 
 function Node:expand_tabs(tabwidth, indentstr)
@@ -230,16 +277,30 @@ function Node:event(event)
 	end
 
 	session.event_node = self
-	vim.cmd("doautocmd User Luasnip" .. events.to_string(self.type, event))
+	vim.api.nvim_exec_autocmds("User", {
+		pattern = "Luasnip" .. events.to_string(self.type, event),
+		modeline = false,
+	})
 end
 
 local function get_args(node, get_text_func_name)
 	local args = {}
 
 	-- Insp(node.parent.snippet.dependents_dict)
-	for _, arg in ipairs(node.args_absolute) do
-		-- Insp(arg)
-		local arg_node = node.parent.snippet.dependents_dict:get(arg).node
+	for _, arg in pairs(node.args_absolute) do
+		-- since arg may be a node, it may not be initialized in the snippet
+		-- and therefore not have an absolute_insert_position. Check for that.
+		if not arg.absolute_insert_position then
+			-- the node is not (yet, maybe) visible.
+			return nil
+		end
+		local arg_table = node.parent.snippet.dependents_dict:get(
+			arg.absolute_insert_position
+		)
+		if not arg_table then
+			return nil
+		end
+		local arg_node = arg_table.node
 		-- maybe the node is part of a dynamicNode and not yet generated.
 		if not arg_node then
 			return nil
@@ -264,8 +325,17 @@ function Node:get_static_args()
 	return get_args(self, "get_static_text")
 end
 
+function Node:get_jump_index()
+	return self.pos
+end
+
 function Node:set_ext_opts(name)
-	self.mark:update_opts(self.ext_opts[name])
+	-- differentiate, either visited or unvisited needs to be set.
+	if name == "passive" then
+		self.mark:update_opts(self:get_passive_ext_opts())
+	else
+		self.mark:update_opts(self.ext_opts[name])
+	end
 end
 
 -- for insert,functionNode.
@@ -291,11 +361,11 @@ function Node:set_dependents() end
 
 function Node:set_argnodes(dict)
 	if self.absolute_insert_position then
-		local value = dict:get(self.absolute_insert_position)
-
-		if value and value.dependents then
-			value.node = self
-		end
+		-- append+remove "node" from absolute_insert_position to quickly create
+		-- key for dict.
+		table.insert(self.absolute_insert_position, "node")
+		dict:set(self.absolute_insert_position, self)
+		self.absolute_insert_position[#self.absolute_insert_position] = nil
 	end
 end
 
@@ -333,6 +403,35 @@ function Node:resolve_node_ext_opts(base_prio, parent_ext_opts)
 		(base_prio or self.parent.ext_opts.base_prio)
 			+ session.config.ext_prio_increase
 	)
+end
+
+function Node:is_interactive()
+	-- safe default.
+	return true
+end
+
+-- initialize active-setting in dry_run-table for `self`.
+function Node:init_dry_run_active(dry_run)
+	if dry_run and dry_run.active[self] == nil then
+		dry_run.active[self] = self.active
+	end
+end
+-- determine whether this node is currently active.
+-- This is its own function (and not just a flat table-check) since we have to
+-- check the data in the dry_run-table or the node, depending on `dry_run`.
+function Node:is_active(dry_run)
+	return (not dry_run and self.active) or (dry_run and dry_run.active[self])
+end
+
+function Node:get_buf_position(opts)
+	opts = opts or {}
+	local raw = opts.raw ~= nil and opts.raw or true
+
+	if raw then
+		return self.mark:pos_begin_end_raw()
+	else
+		return self.mark:pos_begin_end()
+	end
 end
 
 return {

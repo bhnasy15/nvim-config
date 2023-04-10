@@ -17,10 +17,12 @@ return {
       'astro',
       'astro-markdown',
       'blade',
+      'clojure',
       'django-html',
       'htmldjango',
       'edge',
       'eelixir', -- vim ft
+      'elixir',
       'ejs',
       'erb',
       'eruby', -- vim ft

@@ -1,5 +1,8 @@
 local text_node = require("luasnip.nodes.textNode").T
 local wrap_nodes = require("luasnip.util.util").wrap_nodes
+local extend_decorator = require("luasnip.util.extend_decorator")
+local Str = require("luasnip.util.str")
+local rp = require("luasnip.extras").rep
 
 -- https://gist.github.com/tylerneylon/81333721109155b2d244
 local function copy3(obj, seen)
@@ -37,11 +40,13 @@ end
 --   opts:
 --     delimiters: string, 2 distinct characters (left, right), default "{}"
 --     strict: boolean, set to false to allow for unused `args`, default true
+--     repeat_duplicates: boolean, repeat nodes which have jump_index instead of copying them, default false
 -- Returns: a list of strings and elements of `args` inserted into placeholders
 local function interpolate(fmt, args, opts)
 	local defaults = {
 		delimiters = "{}",
 		strict = true,
+		repeat_duplicates = false,
 	}
 	opts = vim.tbl_extend("force", defaults, opts or {})
 
@@ -95,7 +100,12 @@ local function interpolate(fmt, args, opts)
 		-- The nodes are modified in-place as part of constructing the snippet,
 		-- modifying one node twice will lead to UB.
 		if used_keys[key] then
-			table.insert(elements, copy3(args[key]))
+			local jump_index = args[key]:get_jump_index() -- For nodes that don't have a jump index, copy it instead
+			if not opts.repeat_duplicates or jump_index == nil then
+				table.insert(elements, copy3(args[key]))
+			else
+				table.insert(elements, rp(jump_index))
+			end
 		else
 			table.insert(elements, args[key])
 			used_keys[key] = true
@@ -165,24 +175,6 @@ local function interpolate(fmt, args, opts)
 	return elements
 end
 
--- Find the largest common indent in a list of lines and remove it.
-local function remove_common_indent(lines)
-	local max_indent = math.huge
-	for _, line in ipairs(lines) do
-		-- ignore lines with whitespace only
-		local match = line:match("^(%s*)%S")
-		if match then
-			max_indent = math.min(max_indent, #match)
-		end
-	end
-	if max_indent > 0 then
-		lines = vim.tbl_map(function(line)
-			return line:sub(max_indent + 1)
-		end, lines)
-	end
-	return lines
-end
-
 -- Use a format string with placeholders to interpolate nodes.
 --
 -- See `interpolate` documentation for details on the format.
@@ -208,26 +200,9 @@ local function format_nodes(str, nodes, opts)
 	-- optimization: avoid splitting multiple times
 	local lines = nil
 
-	-- this allows to use [[...]] strings ignoring the first and last lines
-	if opts.trim_empty then
-		lines = vim.split(str, "\n", true)
-		if lines[1]:match("^%s*$") then
-			table.remove(lines, 1)
-		end
-		if lines[#lines]:match("^%s*$") then
-			table.remove(lines)
-		end
-	end
-
-	-- remove common indent
-	if opts.dedent then
-		lines = lines or vim.split(str, "\n", true)
-		lines = remove_common_indent(lines)
-	end
-
-	if lines then
-		str = table.concat(lines, "\n")
-	end
+	lines = vim.split(str, "\n", true)
+	Str.process_multiline(lines, opts)
+	str = table.concat(lines, "\n")
 
 	-- pop format_nodes's opts
 	for key, _ in ipairs(defaults) do
@@ -245,13 +220,12 @@ local function format_nodes(str, nodes, opts)
 	end, parts)
 end
 
+extend_decorator.register(format_nodes, { arg_indx = 3 })
+
 return {
 	interpolate = interpolate,
 	format_nodes = format_nodes,
 	-- alias
 	fmt = format_nodes,
-	fmta = function(str, nodes, opts) -- fmt with angle brackets
-		opts = vim.tbl_extend("force", opts or {}, { delimiters = "<>" })
-		return format_nodes(str, nodes, opts)
-	end,
+	fmta = extend_decorator.apply(format_nodes, { delimiters = "<>" }),
 }
