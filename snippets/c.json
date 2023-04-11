@@ -89,15 +89,6 @@
   "#ifndef": {
     "prefix": "#ifndef",
     "body": [
-      "#ifndef ${1:DEBUG}",
-      "$0",
-      "#endif /* ifndef $1 */"
-    ],
-    "description": "#ifndef snippet"
-  },
-  "include once": {
-    "prefix": "once",
-    "body": [
       "#ifndef ${1:FILE}_H",
       "#define $1_H",
       "$0",

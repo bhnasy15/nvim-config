@@ -42,23 +42,26 @@ let s:base = {
 
 fun! vm#maps#all#permanent() abort
   """Default permanent mappings dictionary."""
+  let g:Vm.leader.default = ','
+  let g:Vm.leader.visual = ','
+  let g:Vm.leader.buffer = ','
   let maps = s:base
   let leader = g:Vm.leader.default
   let visual = g:Vm.leader.visual
 
   " map <c-n> in any case
-  let maps["Find Under"][0]              = '<C-n>'
-  let maps["Find Subword Under"][0]      = '<C-n>'
+  let maps["Find Under"][0]              = '<Space>cn'
+  let maps["Find Subword Under"][0]      = '<Space>cn'
 
   if g:VM_default_mappings
     let maps["Reselect Last"][0]         = leader.'gS'
-    let maps["Add Cursor At Pos"][0]     = leader.'\'
+    let maps["Add Cursor At Pos"][0]     = leader.'<Space>c'
     let maps["Start Regex Search"][0]    = leader.'/'
     let maps["Select All"][0]            = leader.'A'
-    let maps["Add Cursor Down"][0]       = '<C-Down>'
-    let maps["Add Cursor Up"][0]         = '<C-Up>'
-    let maps["Select l"][0]              = '<S-Right>'
-    let maps["Select h"][0]              = '<S-Left>'
+    let maps["Add Cursor Down"][0]       = '<Space>cj'
+    let maps["Add Cursor Up"][0]         = '<Space>ck'
+    let maps["Select l"][0]              = '<Space>cl'
+    let maps["Select h"][0]              = '<Space>ch'
     let maps["Visual Regex"][0]          = visual.'/'
     let maps["Visual All"][0]            = visual.'A'
     let maps["Visual Add"][0]            = visual.'a'

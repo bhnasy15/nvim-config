@@ -150,8 +150,14 @@
   },
   "#ifndef": {
     "prefix": "#ifndef",
-    "body": ["#ifndef ${1:DEBUG}", "$0", "#endif // !$1"],
-    "description": "Code snippet for #ifndef"
+    "body": [
+      "#ifndef ${1:FILE}_H",
+      "#define $1_H",
+      "$0",
+      "",
+      "#endif /* end of include guard: $1_H */"
+    ],
+    "description": "Header include guard"
   },
   "#if": {
     "prefix": "#if",
