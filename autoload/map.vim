@@ -21,6 +21,7 @@ nnoremap <silent> <leader>to :Texplore<CR>
 noremap <silent> <leader>W :wa<CR>
 noremap <silent> <leader>w :w<CR>
 noremap <silent> <leader>X :wqa<CR>
+noremap <silent> <leader>x :wq<CR>
 noremap <silent> <leader>Q :qa!<CR>
 noremap <silent> <leader>q :q<CR>
 
