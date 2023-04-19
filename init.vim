@@ -48,5 +48,5 @@ runtime autoload/map.vim
 runtime autoload/netrw-config.vim
 
 command ReqLsp lua require("lsp"); require("luasnip.loaders.from_vscode").lazy_load()
-command NoIgnore lua require("fzf")
+command NoIgnore lua require("fzf-setup")
 
