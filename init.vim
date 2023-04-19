@@ -47,11 +47,9 @@ colorscheme tender
 runtime autoload/map.vim
 runtime autoload/netrw-config.vim
 
-lua << EOF
+command ReqCmp lua require("luasnip.loaders.from_vscode").lazy_load()
 
-	require("luasnip.loaders.from_vscode").lazy_load();
+command ReqLsp lua require("lsp")
 
-	require("lsp");
-
-EOF
+command NoIgnore lua require("fzf")
 

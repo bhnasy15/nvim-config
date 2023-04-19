@@ -6,7 +6,8 @@ nnoremap <silent> <C-+> :let g:neovide_scale_factor+=0.05<CR>
 nnoremap <silent> <C--> :let g:neovide_scale_factor-=0.05<CR>
 nnoremap <silent> <C-=> :let g:neovide_scale_factor=1<CR>
 
-nnoremap <silent> <leader>f :FZF<CR>
+nnoremap <silent> <leader>f :FzfLua files<CR>
+nnoremap <silent> <leader>z :FzfLua<CR>
 
 nnoremap <silent> <leader>tn :tabnew<CR>
 nnoremap <silent> <leader>vn :vs<CR>

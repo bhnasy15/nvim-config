@@ -98,14 +98,11 @@ sources = cmp.config.sources({
 -- Setup lspconfig.
 local capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
 -- Enable some language servers with the additional completion capabilities offered by nvim-cmp
-lspconfig['omnisharp'].setup{
+lspconfig['csharp_ls'].setup{
+	autostart = false,
 	on_attach = on_attach,
-	cmd = {"/home/yarob/.opt/omnisharp-roslyn/stdio.driver/linux-x64/net6.0/OmniSharp", "-lsp"},
-	-- cmd = {"dotnet", "/home/yarob/.opt/omnisharp-roslyn/stdio.driver/linux-x64/net6.0/OmniSharp.dll"},
-    capabilities = capabilities,
-	single_file_support = false,
-	filetypes = {"cs"},
-
+	cmd = {"/home/yarob/.dotnet/tools/csharp-ls"},
+    --capabilities = capabilities,
 }
 
 vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
