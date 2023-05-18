@@ -147,6 +147,12 @@ lspconfig['jdtls'].setup{
 	filetypes = {"java"},
 }
 
+lspconfig['kotlin_language_server'].setup{
+	autostart = false,
+	on_attach = on_attach,
+	cmd = {"/home/yarob/.opt/kotlin_language_server/bin/kotlin-language-server"},
+}
+
 lspconfig['phpactor'].setup{
 	autostart = false,
 	on_attach = on_attach,
