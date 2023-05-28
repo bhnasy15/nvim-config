@@ -2,7 +2,7 @@ set t_Co=265
 
 set mouse=a
 
-set guifont=Fira\ Mono,Kawkab\ Mono:h14
+set guifont=Fira\ Mono,Kawkab\ Mono:h9
 
 set showcmd
 set wildmenu
@@ -40,7 +40,8 @@ set cursorline
 
 set wrap
 
-set spelllang=ar,en
+"set spelllang=ar,en
+set spelllang=en
 
 colorscheme tender
 

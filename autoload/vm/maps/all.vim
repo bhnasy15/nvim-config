@@ -50,23 +50,23 @@ fun! vm#maps#all#permanent() abort
   let visual = g:Vm.leader.visual
 
   " map <c-n> in any case
-  let maps["Find Under"][0]              = '<Space>cn'
-  let maps["Find Subword Under"][0]      = '<Space>cn'
+  let maps["Find Under"][0]              = leader.'cn'
+  let maps["Find Subword Under"][0]      = leader.'cn'
 
   if g:VM_default_mappings
     let maps["Reselect Last"][0]         = leader.'gS'
     let maps["Add Cursor At Pos"][0]     = leader.'<Space>c'
     let maps["Start Regex Search"][0]    = leader.'/'
     let maps["Select All"][0]            = leader.'A'
-    let maps["Add Cursor Down"][0]       = '<Space>cj'
-    let maps["Add Cursor Up"][0]         = '<Space>ck'
-    let maps["Select l"][0]              = '<Space>cl'
-    let maps["Select h"][0]              = '<Space>ch'
+    let maps["Add Cursor Down"][0]       = leader.'cj'
+    let maps["Add Cursor Up"][0]         = leader.'ck'
+    let maps["Select l"][0]              = leader.'cl'
+    let maps["Select h"][0]              = leader.'ch'
     let maps["Visual Regex"][0]          = visual.'/'
     let maps["Visual All"][0]            = visual.'A'
     let maps["Visual Add"][0]            = visual.'a'
-    let maps["Visual Find"][0]           = visual.'f'
-    let maps["Visual Cursors"][0]        = visual.'c'
+    let maps["Visual Find"][0]           = visual.'<space>f'
+    let maps["Visual Cursors"][0]        = visual.'C'
   endif
 
   if g:VM_mouse_mappings
@@ -162,12 +162,12 @@ fun! vm#maps#all#buffer() abort
   call extend(maps, {
         \"Select Cursor Down":      ['<M-C-Down>',  'n'],
         \"Select Cursor Up":        ['<M-C-Up>',    'n'],
-        \"Add Cursor Down":         ['<C-Down>',    'n'],
-        \"Add Cursor Up":           ['<C-Up>',      'n'],
-        \"Select j":                ['<S-Down>',    'n'],
-        \"Select k":                ['<S-Up>',      'n'],
-        \"Select l":                ['<S-Right>',   'n'],
-        \"Select h":                ['<S-Left>',    'n'],
+        \"Add Cursor Down":         ['<C-j>',       'n'],
+        \"Add Cursor Up":           ['<C-k>',       'n'],
+        \"Select j":                ['<S-j>',       'n'],
+        \"Select k":                ['<S-k>',       'n'],
+        \"Select l":                ['<S-l>',       'n'],
+        \"Select h":                ['<S-h>',       'n'],
         \"Single Select l":         ['<M-Right>',   'n'],
         \"Single Select h":         ['<M-Left>',    'n'],
         \"Select e":                ['',            'n'],
@@ -182,6 +182,8 @@ fun! vm#maps#all#buffer() abort
 
   "insert
   call extend(maps, {
+        \"I Return":                ['<CR>',        'i'],
+        \"I BS":                    ['<BS>',        'i'],
         \"I Arrow w":               ['<C-Right>',   'i'],
         \"I Arrow b":               ['<C-Left>',    'i'],
         \"I Arrow W":               ['<C-S-Right>', 'i'],
@@ -194,8 +196,6 @@ fun! vm#maps#all#buffer() abort
         \"I Right Arrow":           ['<Right>',     'i'],
         \"I Up Arrow":              ['<Up>',        'i'],
         \"I Down Arrow":            ['<Down>',      'i'],
-        \"I Return":                ['<CR>',        'i'],
-        \"I BS":                    ['<BS>',        'i'],
         \"I CtrlW":                 ['<C-w>',       'i'],
         \"I CtrlU":                 ['<C-u>',       'i'],
         \"I CtrlD":                 ['<C-d>',       'i'],
