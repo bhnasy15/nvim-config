@@ -1,8 +1,6 @@
-set t_Co=265
+"set t_Co=265
 
 set mouse=a
-
-set guifont=Fira\ Mono,Kawkab\ Mono:h9
 
 set showcmd
 set wildmenu
@@ -19,9 +17,10 @@ set noswapfile
 set nofoldenable
 set foldmethod=manual
 
-set shiftwidth=4
-set tabstop=4
+set shiftwidth=2
+set tabstop=2
 set smartindent
+set expandtab
 
 set nohlsearch
 set showmatch
@@ -38,14 +37,14 @@ set relativenumber
 
 set cursorline
 
-set wrap
+set nowrap
 
-"set spelllang=ar,en
-set spelllang=en
+set spelllang=ar,en
 
 colorscheme tender
 
 runtime autoload/map.vim
+runtime autoload/neovide.vim
 runtime autoload/netrw-config.vim
 
 command ReqLsp lua require("lsp"); require("luasnip.loaders.from_vscode").lazy_load()
