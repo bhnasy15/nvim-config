@@ -104,6 +104,8 @@ return {
         local root = util.root_pattern(unpack(patterns))(fname)
         if root then
           return root
+        else
+          return vim.fn.getcwd()
         end
       end
     end,

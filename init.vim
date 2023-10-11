@@ -1,5 +1,8 @@
+let g:loaded_python3_provider = 0
+let g:loaded_node_provider = 0
+let g:loaded_perl_provider = 0
+let g:loaded_ruby_provider = 0
 "set t_Co=265
-
 set mouse=a
 
 set showcmd
@@ -17,10 +20,10 @@ set noswapfile
 set nofoldenable
 set foldmethod=manual
 
-set shiftwidth=2
-set tabstop=2
-set smartindent
+set shiftwidth=4
+set tabstop=4
 set expandtab
+set smartindent
 
 set nohlsearch
 set showmatch

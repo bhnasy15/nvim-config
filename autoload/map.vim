@@ -26,7 +26,7 @@ noremap <silent> <leader>X :wqa<CR>
 noremap <silent> <leader>x :wq<CR>
 noremap <silent> <leader>Q :qa!<CR>
 noremap <silent> <leader>q :q<CR>
-noremap <silent> <leader>d :bd<CR>
+noremap <silent> <leader>dd :bd<CR>
 
 " language
 nnoremap <silent> <leader>ar :set arabic!<CR>

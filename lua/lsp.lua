@@ -22,7 +22,7 @@ local on_attach = function(client, bufnr)
 	vim.keymap.set('n'    , '<space>Wa'   , vim.lsp.buf.add_workspace_folder     , bufopts )
 	vim.keymap.set('n'    , '<space>Wr'   , vim.lsp.buf.remove_workspace_folder  , bufopts )
 	vim.keymap.set('n'    , '<space>Wl'   , function()
-	print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+        print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
 	end, bufopts)
 end
 
@@ -154,6 +154,13 @@ lspconfig['kotlin_language_server'].setup{
 }
 
 lspconfig['phpactor'].setup{
+    filetypes = { 'php' },
 	autostart = false,
 	on_attach = on_attach,
+}
+
+lspconfig['hls'].setup{
+	autostart = false,
+    filetypes = { 'haskell', 'lhaskell', 'cabal' },
+    on_attach = on_attach,
 }
